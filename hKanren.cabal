@@ -21,3 +21,4 @@ executable hKanren
                       ,s-cargot
                       ,text
                       ,string-conversions
+                      ,syb

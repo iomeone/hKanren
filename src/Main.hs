@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+-- {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GADTs #-}
 
@@ -13,6 +14,8 @@ import Data.Text (Text, pack, unpack)
 
 import Data.String.Conversions
 
+-- import Data.Generics (Data, Typeable, mkQ, mkT, everything, everywhere)
+-- https://github.com/fsestini/mu-kanren/blob/master/src/MuKanren.hs sample is work
 type Var = Int
 
 data Atom where
@@ -23,7 +26,7 @@ deriving instance Show Atom
 (~=) :: (Eq a, Typeable a, Typeable b) => a -> b -> Maybe Bool
 x ~= y = fmap (\HRefl -> x == y) (eqTypeRep (typeOf x) (typeOf y))
 
-type Term = SExpr Atom
+type Term = SExpr Atom 
 
 pattern TPair a t = a ::: t
 pattern TVar v = A (AVar v)
@@ -50,6 +53,13 @@ nums = list . fmap num
 list :: [Term] -> Term
 list = foldr (:::) SNil  
 
+type Sub = [(Var, Term)]
+
+walk :: Term -> Sub -> Term
+walk t@(TVar v) s = maybe t (flip walk s) (lookup v s)
+walk t _ = t
+
+
 
 
 
@@ -72,11 +82,13 @@ ppExpr :: Expr -> Text
 ppExpr e = encode  (setMaxWidth 10 $ basicPrint id) [translate e]
 
 
+
 main :: IO ()
 main = do
-  putStrLn $ cs $ ppExpr a
-  putStrLn $ show a
-  putStrLn "hello world"
+  -- putStrLn $ cs $ ppExpr a
+  -- putStrLn $ show a
+  putStrLn $ printTerm $ walk (TVar 4) [(3, (TVar 2)), (4, (TVar 1))]
+  putStrLn $ printTerm $ walk (TVar 4) [(3, (TVar 2)), (4, (TData  (2::Integer)))]
   where 
     a = Add (Add (Atom 1) (Atom 2)) (Mul (Atom 3) (Atom 4))
 
