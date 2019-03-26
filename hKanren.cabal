@@ -22,3 +22,5 @@ executable hKanren
                       ,text
                       ,string-conversions
                       ,syb
+                      -- ,mtl
+                      ,transformers
