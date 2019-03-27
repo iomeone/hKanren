@@ -12,6 +12,7 @@ import Control.Monad.Trans.Maybe
 import Type.Reflection
 import Data.Bool
 import Data.List
+import Data.Maybe
 import Data.SCargot
 import Data.SCargot.Repr.Basic
 import qualified Data.SCargot.Repr.Basic as DSRB
@@ -123,6 +124,70 @@ emptyState :: State
 emptyState = ([], 0)
 
 
+delay = (Nothing : )
+
+
+-- fives :: Term -> Goal
+-- fives x = (x === num 5)
+-- fives (num 5) (emptyState )   
+-- if we call like this , the return value is [Just ([],0)], it says that there is an answer !!
+-- why Just [], 0, because when we unify 5 and 5 (which type is TData), we simply return the empty substitute enviroment.
+
+
+
+fives :: Term -> Goal
+fives x = disj (x === num 5) (delay . fives x) 
+-- fives (num 5) (emptyState )   
+-- if we call like this, the return value is [Just ([],0),Nothing,Just ([],0),Nothing,Just ([],0),Nothing,Just
+
+
+
+trunc :: Int -> [Maybe State] -> [Maybe State]
+trunc _ [] = []
+trunc m (Just x : xs) = Just x : trunc m xs
+trunc m (Nothing : xs) = if m == 0 then [] else Nothing : trunc (m - 1) xs
+
+
+mytake :: Int -> Goal -> [ State]
+mytake n g =take n $ catMaybes $ (trunc n) (g emptyState)
+--  mytake 5 $ fives (num 5)
+--  if we call like this, we can get five answer！ like [([],0),([],0),([],0),([],0),([],0)]
+--  the answer says that, we can always unify successfully with num 5 and num 5. we unified 5 times,and all 5 time succeed.
+
+mytake2 :: Int -> Goal -> [ State]
+mytake2 n g =take n $ catMaybes $  (g emptyState)
+-- if we call mytake2 5 $ fives (num 5) ,  the call will loop infinity
+-- because catMaybes with lots of nothing will be [], so we'd better use trunc to limit the recursive calls.
+-- so the cleaver way is like as :
+
+takeLimit :: Int -> Maybe Int -> [Maybe State] -> [State]
+takeLimit n m res= take n $ catMaybes $ (maybe id trunc m) $ res
+
+-- takeLimit 5 (Just 10) $ fives (num 5) emptyState
+
+
+ppSub :: Sub -> String
+ppSub sc = "[" ++ f sc ++ "]"
+  where f = concat . intersperse ", " .
+             fmap (\(v,t) -> "(#" ++ show v ++ ", " ++ printTerm t ++ ")")
+
+ppState :: State -> String
+ppState (s,c) = "(" ++ ppSub s ++ ", " ++ show c ++ ")"
+
+-- fmap ppState $ takeLimit 5 (Just 10) $ fives (num 5) emptyState
+
+
+takeS :: Int -> Goal -> IO ()
+takeS n g = mapM_ putStrLn ( fmap ppState . takeLimit n Nothing $ g emptyState)
+
+takeS' :: Int -> Int -> Goal -> IO ()
+takeS' n m g = mapM_ putStrLn ( fmap ppState . takeLimit n (Just m) $ g emptyState)
+
+-- takeS' 1 10 (fives (num 3)) will print Nothing, because catMaybes lots of Nothing is []
+-- takeS 1  (fives (num 3))  will loop forever, because  catMaybes lots of Nothing is [], and take 1 answer will wait forever.
+
+
+
 
 
 
@@ -141,6 +206,10 @@ translate e = case e of
 
 ppExpr :: Expr -> Text
 ppExpr e = encode  (setMaxWidth 10 $ basicPrint id) [translate e]
+
+
+
+
 
 n2i i = i :: Integer;
 
